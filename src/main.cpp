@@ -200,15 +200,18 @@ int main() {
   	map_waypoints_dx.push_back(d_x);
   	map_waypoints_dy.push_back(d_y);
   }
+  //start in lane 1;
+  int lane = 1;
+
+  // Have a reference velocity to target
+  double ref_vel = 0.0; // mph
+
+  bool check_lane_change = false;
+  bool lane_change = false;
 
 
-  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+  h.onMessage([&check_lane_change, &lane_change, &ref_vel, &lane, &map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
-      //start in lane 1;
-      int lane = 1;
-
-      // Have a reference velocity to target
-      double ref_vel = 49.5; // mph
 
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -246,6 +249,69 @@ int main() {
           	auto sensor_fusion = j[1]["sensor_fusion"];
 
             int prev_size = previous_path_x.size();
+
+            // avoid other cars
+            if(prev_size > 0){
+                car_s = end_path_s;
+            }
+            bool too_close = false;
+
+
+            // lane change djuge
+            if(check_lane_change){
+                for(int i=0; i < sensor_fusion.size(); i++){
+                    float d = sensor_fusion[i][6];
+                    if(d < (2+4*lane+2) && d > (2+4*lane-2)){
+                        double vx = sensor_fusion[i][3];
+                        double vy = sensor_fusion[i][4];
+                        double check_speed = sqrt(vx*vx+vy*vy);
+                        double check_car_s = sensor_fusion[i][5];
+
+                        check_car_s += (double)prev_size*.02*check_speed;
+                        printf("%f %d\n", fabs(check_car_s-car_s), lane);
+                        if(fabs(check_car_s-car_s) > 10.0){
+                            lane_change = true;
+                        }
+                    }
+                }
+                check_lane_change = false;
+            }
+
+            for(int i=0; i < sensor_fusion.size(); i++){
+                float d = sensor_fusion[i][6];
+                if(d < (2+4*lane+2) && d > (2+4*lane-2)){
+                    double vx = sensor_fusion[i][3];
+                    double vy = sensor_fusion[i][4];
+                    double check_speed = sqrt(vx*vx+vy*vy);
+                    double check_car_s = sensor_fusion[i][5];
+
+                    check_car_s += (double)prev_size*.02*check_speed;
+                    if((check_car_s > car_s) && (check_car_s-car_s < 30)){
+                        //ref_vel = 29.5;
+                        too_close = true;
+
+                        // lane change judge
+                        check_lane_change = true;
+
+                        // lane change judge
+                        if(lane_change){
+                            if(lane == 1){
+                                lane = (rand() % 2)*2;
+                            }else{
+                                lane = 1;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if(too_close){
+                ref_vel -= .224;
+            }else if(ref_vel < 49.5){
+                ref_vel += .224;
+            }
+
+
 
             vector<double> ptsx;
             vector<double> ptsy;
