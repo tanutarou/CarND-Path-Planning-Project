@@ -1,4 +1,4 @@
-## run along the lane
+## Run along the lane
 Running along the lane is basic selection in my path plannning.
 * I used Frenet coordinates to plan path. It is very useful to asign path.
 * I used [spline library](https://kluge.in-chemnitz.de/opensource/spline/) to smooth my path. It makes that car's jerk do not exceed max jerk.
